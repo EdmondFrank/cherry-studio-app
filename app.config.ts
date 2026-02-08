@@ -18,7 +18,7 @@ export default {
     newArchEnabled: true,
     entryPoint: './src/app.js',
     updates: {
-      url: 'https://u.expo.dev/80096eaf-3ad0-4b87-a466-15f04da1bacc'
+      url: 'https://u.expo.dev/2d9807f6-4405-4177-a5d3-06acbf4b4fc5'
     },
     runtimeVersion: {
       policy: 'appVersion'
@@ -177,7 +177,7 @@ export default {
     },
     extra: {
       eas: {
-        projectId: '80096eaf-3ad0-4b87-a466-15f04da1bacc'
+        projectId: '2d9807f6-4405-4177-a5d3-06acbf4b4fc5'
       },
       appVersion
     }
