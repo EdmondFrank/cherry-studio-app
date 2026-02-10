@@ -40,7 +40,8 @@ export const MODEL_SUPPORTED_REASONING_EFFORT: ReasoningEffortConfig = {
   hunyuan: ['auto'] as const,
   zhipu: ['auto'] as const,
   perplexity: ['low', 'medium', 'high'] as const,
-  deepseek_hybrid: ['auto'] as const
+  deepseek_hybrid: ['auto'] as const,
+  kimi_k2_5: ['none', 'auto'] as const
 } as const
 
 // 模型类型到支持选项的映射表
@@ -65,7 +66,8 @@ export const MODEL_SUPPORTED_OPTIONS: ThinkingOptionConfig = {
   hunyuan: ['none', ...MODEL_SUPPORTED_REASONING_EFFORT.hunyuan] as const,
   zhipu: ['none', ...MODEL_SUPPORTED_REASONING_EFFORT.zhipu] as const,
   perplexity: MODEL_SUPPORTED_REASONING_EFFORT.perplexity,
-  deepseek_hybrid: ['none', ...MODEL_SUPPORTED_REASONING_EFFORT.deepseek_hybrid] as const
+  deepseek_hybrid: ['none', ...MODEL_SUPPORTED_REASONING_EFFORT.deepseek_hybrid] as const,
+  kimi_k2_5: ['default', ...MODEL_SUPPORTED_REASONING_EFFORT.kimi_k2_5] as const
 } as const
 
 const withModelIdAndNameAsId = <T>(model: Model, fn: (model: Model) => T): { idResult: T; nameResult: T } => {
@@ -125,6 +127,9 @@ const _getThinkModelType = (model: Model): ThinkingModelType => {
   else if (isSupportedReasoningEffortPerplexityModel(model)) thinkingModelType = 'perplexity'
   else if (isSupportedThinkingTokenZhipuModel(model)) thinkingModelType = 'zhipu'
   else if (isDeepSeekHybridInferenceModel(model)) thinkingModelType = 'deepseek_hybrid'
+  else if (isSupportedThinkingTokenKimiModel(model)) {
+    thinkingModelType = 'kimi_k2_5'
+  }
   return thinkingModelType
 }
 
@@ -161,7 +166,8 @@ function _isSupportedThinkingTokenModel(model: Model): boolean {
     isSupportedThinkingTokenClaudeModel(model) ||
     isSupportedThinkingTokenDoubaoModel(model) ||
     isSupportedThinkingTokenHunyuanModel(model) ||
-    isSupportedThinkingTokenZhipuModel(model)
+    isSupportedThinkingTokenZhipuModel(model) ||
+    isSupportedThinkingTokenKimiModel(model)
   )
 }
 
@@ -438,6 +444,20 @@ export const isSupportedThinkingTokenZhipuModel = (model: Model): boolean => {
   return ['glm-4.5', 'glm-4.6'].some(id => modelId.includes(id))
 }
 
+/**
+ * Detects whether a Kimi model supports thinking control
+ *
+ * This function identifies Kimi models that support thinking token control.
+ * Currently only supports Kimi K2.5 and its variants.
+ *
+ * @param model - The model object to check
+ * @returns true if the model supports thinking control, false otherwise
+ */
+export const isSupportedThinkingTokenKimiModel = (model: Model): boolean => {
+  const modelId = getLowerBaseModelName(model.id, '/')
+  return ['kimi-k2.5'].some((id) => modelId.includes(id))
+}
+
 export const isDeepSeekHybridInferenceModel = (model: Model) => {
   const modelId = getLowerBaseModelName(model.id)
   // deepseek官方使用chat和reasoner做推理控制，其他provider需要单独判断，id可能会有所差别
@@ -485,6 +505,27 @@ export const isMiniMaxReasoningModel = (model?: Model): boolean => {
   return (['minimax-m1', 'minimax-m2'] as const).some(id => modelId.includes(id))
 }
 
+/**
+ * Check if the model is a Kimi reasoning model
+ *
+ * This function identifies Moonshot AI's Kimi series reasoning models.
+ * Currently should only support:
+ * - Kimi K2 Thinking and its variants (including -turbo suffix)
+ * - Kimi K2.5
+ *
+ * @param model - The model object to check, can be undefined
+ * @returns true if it's a Kimi reasoning model, false otherwise
+ */
+export function isKimiReasoningModel(model?: Model): boolean {
+  if (!model) {
+    return false
+  }
+  const modelId = getLowerBaseModelName(model.id, '/')
+  // Match kimi-k2-thinking, kimi-k2-thinking-turbo, or kimi-k2.5
+  // The regex ensures no extra suffixes after these patterns
+  return /^kimi-k2-thinking(?:-turbo)?$|^kimi-k2\.5(?:-\w)*$/.test(modelId)
+}
+
 export function isReasoningModel(model?: Model): boolean {
   if (!model || isEmbeddingModel(model) || isRerankModel(model) || isTextToImageModel(model)) {
     return false
@@ -520,6 +561,7 @@ export function isReasoningModel(model?: Model): boolean {
     isDeepSeekHybridInferenceModel(model) ||
     isLingReasoningModel(model) ||
     isMiniMaxReasoningModel(model) ||
+    isKimiReasoningModel(model) ||
     modelId.includes('magistral') ||
     modelId.includes('pangu-pro-moe') ||
     modelId.includes('seed-oss')
