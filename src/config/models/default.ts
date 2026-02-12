@@ -7,6 +7,27 @@ export const glm45FlashModel: Model = {
   group: 'GLM-4.5'
 }
 
+export const glm5Model: Model = {
+  id: 'glm-5',
+  name: 'GLM-5',
+  provider: 'cherryai',
+  group: 'GLM-5'
+}
+
+export const glm5FlashModel: Model = {
+  id: 'glm-5-flash',
+  name: 'GLM-5-Flash',
+  provider: 'cherryai',
+  group: 'GLM-5'
+}
+
+export const glm5ProModel: Model = {
+  id: 'glm-5-pro',
+  name: 'GLM-5-Pro',
+  provider: 'cherryai',
+  group: 'GLM-5'
+}
+
 export const qwen38bModel: Model = {
   id: 'Qwen/Qwen3-8B',
   name: 'Qwen3-8B',
@@ -705,6 +726,24 @@ export const SYSTEM_MODELS: Record<SystemProviderId | 'defaultModel', Model[]> =
     { id: 'yi-vision-v2', name: 'Yi Vision v2', provider: 'yi', group: 'yi-vision', owned_by: '01.ai' }
   ],
   zhipu: [
+    {
+      id: 'glm-5',
+      provider: 'zhipu',
+      name: 'GLM-5',
+      group: 'GLM-5'
+    },
+    {
+      id: 'glm-5-flash',
+      provider: 'zhipu',
+      name: 'GLM-5-Flash',
+      group: 'GLM-5'
+    },
+    {
+      id: 'glm-5-pro',
+      provider: 'zhipu',
+      name: 'GLM-5-Pro',
+      group: 'GLM-5'
+    },
     {
       id: 'glm-4.5-flash',
       provider: 'zhipu',

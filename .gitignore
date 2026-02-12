@@ -76,3 +76,4 @@ coverage/
 modules/*/android/build/
 modules/*/ios/build/
 modules/*/.gradle/
+.cecli*
