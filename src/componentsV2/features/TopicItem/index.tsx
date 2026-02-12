@@ -162,6 +162,7 @@ export const TopicItem: FC<TopicItemProps> = ({
     } catch (error) {
       toast.show(t('common.error_occurred' + '\n' + (error as Error)?.message), { color: '$red100', duration: 2500 })
     } finally {
+      switchTopic(topic.id)
       setIsGeneratingName(false)
     }
   }
