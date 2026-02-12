@@ -194,12 +194,14 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
   }
 
   const quickAssistantModel = quickAssistant.defaultModel || getDefaultModel()
-  const assistantForProvider = quickAssistant.model ? quickAssistant : { ...quickAssistant, model: quickAssistantModel }
-  const assistantForRequest = quickAssistant.defaultModel
-    ? assistantForProvider
-    : { ...assistantForProvider, defaultModel: quickAssistantModel }
-  const provider = await getAssistantProvider(assistantForProvider)
 
+  const assistantForRequest: Assistant = {
+    ...quickAssistant,
+    defaultModel: quickAssistantModel,
+    model: quickAssistant.model || quickAssistantModel
+  }
+
+  const provider = await getAssistantProvider(assistantForRequest)
   // 总结上下文总是取最后5条消息
   const contextMessages = takeRight(messages, 5)
 
