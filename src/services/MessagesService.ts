@@ -25,7 +25,7 @@ import { findMainTextBlocks } from '@/utils/messageUtils/find'
 import { getTopicQueue } from '@/utils/queue'
 
 import { fetchTopicNaming } from './ApiService'
-import { assistantService, getDefaultModel } from './AssistantService'
+import { assistantService, getDefaultAssistant, getDefaultModel } from './AssistantService'
 import { BlockManager, createCallbacks } from './messageStreaming'
 import { transformMessagesAndFetch } from './OrchestrationService'
 import { getAssistantProvider } from './ProviderService'
@@ -827,7 +827,9 @@ export async function fetchTranslateThunk(assistantMessageId: string, message: M
     throw new Error('Translate assistant not found')
   }
 
-  const translateAssistantModel = translateAssistant.defaultModel || getDefaultModel()
+  const defaultAssistant = await getDefaultAssistant()
+  const defaultAssistantModel = defaultAssistant?.defaultModel
+  const translateAssistantModel = defaultAssistantModel || translateAssistant.defaultModel || getDefaultModel()
   const assistantForProvider = translateAssistant.model
     ? translateAssistant
     : { ...translateAssistant, model: translateAssistantModel }

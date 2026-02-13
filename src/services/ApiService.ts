@@ -19,7 +19,7 @@ import { findFileBlocks, getMainTextContent } from '@/utils/messageUtils/find'
 import { hasApiKey } from '@/utils/providerUtils'
 
 import AiProviderNew from '../aiCore/index_new'
-import { assistantService, getDefaultModel } from './AssistantService'
+import { assistantService, getDefaultAssistant, getDefaultModel } from './AssistantService'
 import { mcpService } from './McpService'
 import { getAssistantProvider } from './ProviderService'
 import type { StreamProcessorCallbacks } from './StreamProcessingService'
@@ -193,7 +193,9 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
     return
   }
 
-  const quickAssistantModel = quickAssistant.defaultModel || getDefaultModel()
+  const defaultAssistant = await getDefaultAssistant()
+  const defaultAssistantModel = defaultAssistant?.defaultModel
+  const quickAssistantModel = defaultAssistantModel || quickAssistant.defaultModel || getDefaultModel()
 
   const assistantForRequest: Assistant = {
     ...quickAssistant,
