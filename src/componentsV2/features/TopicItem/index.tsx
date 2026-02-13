@@ -160,9 +160,9 @@ export const TopicItem: FC<TopicItemProps> = ({
       setIsGeneratingName(true)
       await fetchTopicNaming(topic.id, true)
     } catch (error) {
-      toast.show(t('common.error_occurred' + '\n' + (error as Error)?.message), { color: '$red100', duration: 2500 })
+      const errorMessage = (error as Error)?.message || i18n.t('common.unknown_error')
+      toast.show(`${i18n.t('common.error_occurred')}\n${errorMessage}`, { color: '$red100', duration: 2500 })
     } finally {
-      switchTopic(topic.id)
       setIsGeneratingName(false)
     }
   }

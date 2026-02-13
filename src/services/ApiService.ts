@@ -28,6 +28,138 @@ import { topicService } from './TopicService'
 
 const logger = loggerService.withContext('fetchChatCompletion')
 
+function validateTopicName(name: string | null | undefined, currentName: string): string | null {
+  if (!name || typeof name !== 'string') {
+    return null
+  }
+
+  const trimmed = name.trim()
+
+  if (trimmed.length === 0) {
+    return null
+  }
+
+  const cleaned = trimmed
+    .replace(/[.,，：:""''''""''【】\[\]{}()（）<>~!@#$%^&*+=|-]/g, '')
+    .replace(/\s+/g, ' ')
+
+  const isChinese = /[\u4e00-\u9fa5]/.test(cleaned)
+  const maxLength = isChinese ? 20 : 30
+
+  if (cleaned.length > maxLength) {
+    return null
+  }
+
+  return cleaned
+}
+
+export async function fetchTopicNaming(topicId: string, regenerate: boolean = false) {
+  logger.info('Fetching topic naming...')
+  const topic = await topicService.getTopic(topicId)
+  const messages = await messageDatabase.getMessagesByTopicId(topicId)
+
+  if (!topic) {
+    logger.error(`[fetchTopicNaming] Topic with ID ${topicId} not found.`)
+    return
+  }
+
+  const originalName = topic.name
+
+  if (originalName !== t('topics.new_topic') && !regenerate) {
+    return
+  }
+
+  let callbacks: StreamProcessorCallbacks = {}
+
+  callbacks = {
+    onTextComplete: async finalText => {
+      const validatedName = validateTopicName(finalText, originalName)
+      if (validatedName) {
+        await topicService.updateTopic(topicId, { name: validatedName })
+      } else {
+        logger.warn(`[fetchTopicNaming] Invalid AI response, keeping original name: ${originalName}`)
+      }
+    }
+  }
+  const streamProcessorCallbacks = createStreamProcessor(callbacks)
+  const quickAssistant = await assistantService.getAssistant('quick')
+
+  if (!quickAssistant) {
+    return
+  }
+
+  const contextMessages = takeRight(messages, 5)
+
+  const structuredMessages = await Promise.all(
+    contextMessages.map(async message => {
+      const mainText = await getMainTextContent(message)
+      const truncatedText = mainText.length > 500 ? mainText.substring(0, 500) + '...' : mainText
+      const fileBlocks = await findFileBlocks(message)
+      const fileList = fileBlocks.map(block => block.file.origin_name)
+
+      return {
+        role: message.role,
+        content: truncatedText,
+        files: fileList.length > 0 ? fileList : undefined
+      }
+    })
+  )
+
+  const conversation = JSON.stringify(structuredMessages)
+
+  const provider = await getAssistantProvider(quickAssistant)
+
+  const aiSdkParams = {
+    system: quickAssistant.prompt,
+    prompt: conversation
+  }
+  const modelId = topic.model || quickAssistant.defaultModel || getDefaultModel()
+  const model = typeof modelId === 'string' ? { id: modelId, name: modelId } : modelId
+
+  const middlewareConfig: AiSdkMiddlewareConfig = {
+    streamOutput: false,
+    onChunk: streamProcessorCallbacks,
+    model: model,
+    provider: provider,
+    enableReasoning: false,
+    isPromptToolUse: false,
+    isSupportedToolUse: false,
+    isImageGenerationEndpoint: false,
+    enableWebSearch: false,
+    enableGenerateImage: false,
+    enableUrlContext: false,
+    mcpTools: []
+  }
+
+  const assistantForRequest: Assistant = {
+    ...quickAssistant,
+    defaultModel: model,
+    model: model
+  }
+
+  const AI = new AiProviderNew(model, provider)
+
+  try {
+    const result = await AI.completions(model.id, aiSdkParams, {
+      ...middlewareConfig,
+      assistant: assistantForRequest,
+      topicId,
+      callType: 'summary'
+    })
+
+    const rawText = result.getText()
+    const validatedName = validateTopicName(rawText, originalName)
+
+    if (validatedName) {
+      await topicService.updateTopic(topicId, { name: validatedName })
+    } else {
+      logger.warn(`[fetchTopicNaming] Validation failed for AI response: "${rawText}", keeping original: ${originalName}`)
+    }
+  } catch (error) {
+    logger.error('[fetchTopicNaming] Error during topic naming:', error as Error)
+  }
+}
+
 export async function fetchChatCompletion({
   messages,
   prompt,
@@ -57,7 +189,6 @@ export async function fetchChatCompletion({
     ]
   }
 
-  // 使用 transformParameters 模块构建参数
   const {
     params: aiSdkParams,
     modelId,
@@ -85,7 +216,6 @@ export async function fetchChatCompletion({
     webSearchPluginConfig
   }
 
-  // --- Call AI Completions ---
   try {
     await AI.completions(modelId, aiSdkParams, {
       ...middlewareConfig,
@@ -152,7 +282,6 @@ export async function checkApi(provider: Provider, model: Model): Promise<void> 
         shouldThrow: true
       }
 
-      // Try streaming check first
       const result = await ai.completions(params)
 
       if (!result.getText()) {
@@ -165,135 +294,18 @@ export async function checkApi(provider: Provider, model: Model): Promise<void> 
   }
 }
 
-export async function fetchTopicNaming(topicId: string, regenerate: boolean = false) {
-  logger.info('Fetching topic naming...')
-  const topic = await topicService.getTopic(topicId)
-  const messages = await messageDatabase.getMessagesByTopicId(topicId)
-
-  if (!topic) {
-    logger.error(`[fetchTopicNaming] Topic with ID ${topicId} not found.`)
-    return
-  }
-
-  if (topic.name !== t('topics.new_topic') && !regenerate) {
-    return
-  }
-
-  let callbacks: StreamProcessorCallbacks = {}
-
-  callbacks = {
-    onTextComplete: async finalText => {
-      await topicService.updateTopic(topicId, { name: finalText.trim() })
-    }
-  }
-  const streamProcessorCallbacks = createStreamProcessor(callbacks)
-  const quickAssistant = await assistantService.getAssistant('quick')
-
-  if (!quickAssistant) {
-    return
-  }
-
-  const defaultAssistant = await getDefaultAssistant()
-  const defaultAssistantModel = defaultAssistant?.defaultModel
-  const quickAssistantModel = defaultAssistantModel || quickAssistant.defaultModel || getDefaultModel()
-
-  const assistantForRequest: Assistant = {
-    ...quickAssistant,
-    defaultModel: quickAssistantModel,
-    model: quickAssistant.model || quickAssistantModel
-  }
-
-  const provider = await getAssistantProvider(assistantForRequest)
-  // 总结上下文总是取最后5条消息
-  const contextMessages = takeRight(messages, 5)
-
-  // LLM对多条消息的总结有问题，用单条结构化的消息表示会话内容会更好
-  // 构建结构化消息对象（只保留文本和文件名，不传完整文件内容）
-  const structuredMessages = await Promise.all(
-    contextMessages.map(async message => {
-      const mainText = await getMainTextContent(message)
-      const fileBlocks = await findFileBlocks(message)
-      const fileList = fileBlocks.map(block => block.file.origin_name)
-
-      return {
-        role: message.role,
-        mainText,
-        files: fileList.length > 0 ? fileList : undefined
-      }
-    })
-  )
-
-  const conversation = JSON.stringify(structuredMessages)
-
-  const AI = new AiProviderNew(quickAssistantModel, provider)
-
-  // 使用 system + prompt 格式，而非多条消息格式
-  const aiSdkParams = {
-    system: quickAssistant.prompt,
-    prompt: conversation
-  }
-  const modelId = quickAssistantModel.id
-
-  const middlewareConfig: AiSdkMiddlewareConfig = {
-    streamOutput: false,
-    onChunk: streamProcessorCallbacks,
-    model: quickAssistantModel,
-    provider: provider,
-    enableReasoning: false,
-    isPromptToolUse: false,
-    isSupportedToolUse: false,
-    isImageGenerationEndpoint: false,
-    enableWebSearch: false,
-    enableGenerateImage: false,
-    enableUrlContext: false,
-    mcpTools: []
-  }
-
-  try {
-    return (
-      (
-        await AI.completions(modelId, aiSdkParams, {
-          ...middlewareConfig,
-          assistant: assistantForRequest,
-          topicId,
-          callType: 'summary'
-        })
-      ).getText() || t('topics.new_topic')
-    )
-  } catch (error) {
-    logger.error('Error during topic naming:', error)
-    return ''
-  }
-}
-
-/**
- * Fetch MCP tools for an assistant
- *
- * Refactored to use McpService for optimized caching and tool fetching.
- *
- * @param assistant - The assistant with MCP server configuration
- * @returns Array of enabled MCP tools
- */
 export async function fetchAssistantMcpTools(assistant: Assistant) {
   let mcpTools: MCPTool[] = []
 
-  // Get all active MCP servers using McpService (with caching)
   const activedMcpServers = await mcpService.getActiveMcpServers()
   const assistantMcpServers = assistant.mcpServers || []
 
-  // Filter to only MCP servers enabled for this assistant
   const enabledMCPs = activedMcpServers.filter(server => assistantMcpServers.some(s => s.id === server.id))
 
   if (enabledMCPs && enabledMCPs.length > 0) {
     try {
-      // Fetch tools for each enabled MCP server using McpService
-      // This automatically handles disabledTools filtering
       const toolPromises = enabledMCPs.map(async (mcpServer: MCPServer) => {
         try {
-          // Use McpService.getMcpTools() which handles:
-          // - Builtin tools fetching
-          // - Future MCP protocol integration
-          // - Automatic filtering of disabledTools
           return await mcpService.getMcpTools(mcpServer.id)
         } catch (error) {
           logger.error(`Error fetching tools from MCP server ${mcpServer.name}:`, error as Error)

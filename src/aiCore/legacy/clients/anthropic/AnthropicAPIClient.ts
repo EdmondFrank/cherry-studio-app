@@ -613,9 +613,9 @@ export class AnthropicAPIClient extends BaseApiClient<
           thinking: this.getBudgetToken(assistant, model),
           tools: tools.length > 0 ? tools : undefined,
           stream: streamOutput,
-          // 只在对话场景下应用自定义参数，避免影响翻译、总结等其他业务逻辑
+          // 只在对话和总结场景下应用自定义参数，避免影响翻译等其他业务逻辑
           // 注意：用户自定义参数总是应该覆盖其他参数
-          ...(coreRequest.callType === 'chat' ? this.getCustomParameters(assistant) : {})
+          ...(coreRequest.callType === 'chat' || coreRequest.callType === 'summary' ? this.getCustomParameters(assistant) : {})
         }
 
         const timeout = this.getTimeout(model)
