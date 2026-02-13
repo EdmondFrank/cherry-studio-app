@@ -85,10 +85,16 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
   const quickAssistant = await assistantService.getAssistant('quick')
 
   if (!quickAssistant) {
+    logger.error('[fetchTopicNaming] Quick assistant not found')
     return
   }
 
   const contextMessages = takeRight(messages, 5)
+
+  if (contextMessages.length === 0) {
+    logger.warn('[fetchTopicNaming] No messages found for topic naming')
+    return
+  }
 
   const structuredMessages = await Promise.all(
     contextMessages.map(async message => {
@@ -109,11 +115,36 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
 
   const provider = await getAssistantProvider(quickAssistant)
 
+  if (!provider) {
+    logger.error('[fetchTopicNaming] Provider not found for quick assistant', {
+      assistantId: quickAssistant.id,
+      providerId: quickAssistant.providerId
+    })
+    return
+  }
+
+  if (!hasApiKey(provider)) {
+    logger.error('[fetchTopicNaming] Provider API key missing', {
+      providerId: provider.id,
+      providerType: provider.type
+    })
+    return
+  }
+
   const aiSdkParams = {
     system: quickAssistant.prompt,
     prompt: conversation
   }
   const modelId = topic.model || quickAssistant.defaultModel || getDefaultModel()
+
+  if (!modelId) {
+    logger.error('[fetchTopicNaming] Model ID not found', {
+      topicModel: topic.model,
+      assistantDefaultModel: quickAssistant.defaultModel
+    })
+    return
+  }
+
   const model = typeof modelId === 'string' ? { id: modelId, name: modelId } : modelId
 
   const middlewareConfig: AiSdkMiddlewareConfig = {
@@ -148,6 +179,17 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
     })
 
     const rawText = result.getText()
+
+    if (!rawText || rawText.trim().length === 0) {
+      logger.error('[fetchTopicNaming] Empty response from AI', {
+        topicId,
+        modelId: model.id,
+        providerType: provider.type,
+        messageCount: contextMessages.length
+      })
+      return
+    }
+
     const validatedName = validateTopicName(rawText, originalName)
 
     if (validatedName) {
@@ -156,7 +198,16 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
       logger.warn(`[fetchTopicNaming] Validation failed for AI response: "${rawText}", keeping original: ${originalName}`)
     }
   } catch (error) {
-    logger.error('[fetchTopicNaming] Error during topic naming:', error as Error)
+    logger.error('[fetchTopicNaming] Error during topic naming:', error as Error, {
+      topicId,
+      modelId: model.id,
+      providerType: provider?.type,
+      messageCount: contextMessages.length,
+      assistantId: quickAssistant.id,
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined
+    })
   }
 }
 
