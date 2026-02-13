@@ -149,7 +149,6 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
 
   const middlewareConfig: AiSdkMiddlewareConfig = {
     streamOutput: false,
-    onChunk: streamProcessorCallbacks,
     model: model,
     provider: provider,
     enableReasoning: false,
