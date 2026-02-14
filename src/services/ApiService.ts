@@ -133,7 +133,7 @@ export async function fetchTopicNaming(topicId: string, regenerate: boolean = fa
 
   const aiSdkParams = {
     system: quickAssistant.prompt,
-    prompt: conversation
+    messages: [{ role: 'user', content: conversation }]
   }
   const modelId = topic.model || quickAssistant.defaultModel || getDefaultModel()
 
