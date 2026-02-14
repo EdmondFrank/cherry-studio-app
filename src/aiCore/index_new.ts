@@ -304,14 +304,20 @@ export default class ModernAiProvider {
       return {
         getText: () => finalText
       }
+    } else if (config.streamOutput === false) {
+      const result = await executor.generateText({
+        ...params,
+        model
+      })
+
+      return {
+        getText: () => result.text
+      }
     } else {
       const streamResult = await executor.streamText({
         ...params,
         model
       })
-
-      // 强制消费流,不然await streamResult.text会阻塞
-      await streamResult?.consumeStream()
 
       const finalText = await streamResult.text
 
