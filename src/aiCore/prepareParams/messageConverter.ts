@@ -159,7 +159,7 @@ async function convertMessageToAssistantModelMessage(
   }
 
   for (const thinkingBlock of thinkingBlocks) {
-    parts.push({ type: 'text', text: thinkingBlock.content })
+    parts.push({ type: 'reasoning', text: thinkingBlock.content })
   }
 
   for (const fileBlock of fileBlocks) {
