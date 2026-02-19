@@ -478,14 +478,19 @@ class McpClientService {
     // The provider handles token storage and browser-based authorization
     const authProvider = createMobileOAuthProvider(baseUrl)
 
-    // Create transport with custom headers and OAuth support
+    // Calculate timeout in milliseconds (default 300s, min 5s, max 3600s)
+    const timeoutSeconds = Math.min(Math.max(server.timeout ?? 300, 5), 3600)
+    const timeoutMs = timeoutSeconds * 1000
+
+    // Create transport with custom headers, OAuth support, and timeout
     const transport = new RNStreamableHTTPClientTransport(baseUrl, {
       requestInit: server.headers
         ? {
             headers: server.headers
           }
         : undefined,
-      authProvider
+      authProvider,
+      timeout: timeoutMs
     })
 
     // Set up transport event handlers

@@ -62,6 +62,11 @@ export interface RNStreamableHTTPClientTransportOptions {
    * 1. Inject Bearer token from provider.tokens() into Authorization header
    */
   authProvider?: OAuthClientProvider
+  /**
+   * Request timeout in milliseconds.
+   * If not provided, no timeout is applied.
+   */
+  timeout?: number
 }
 
 export class RNStreamableHTTPClientTransport implements Transport {
@@ -72,6 +77,7 @@ export class RNStreamableHTTPClientTransport implements Transport {
   private _abortController?: AbortController
   private _protocolVersion?: string
   private _authProvider?: OAuthClientProvider
+  private _timeout?: number
 
   public onclose?: () => void
   public onerror?: (error: Error) => void
@@ -83,6 +89,7 @@ export class RNStreamableHTTPClientTransport implements Transport {
     this._requestInit = options?.requestInit
     this._sessionId = options?.sessionId
     this._authProvider = options?.authProvider
+    this._timeout = options?.timeout
   }
 
   /**
@@ -183,6 +190,11 @@ export class RNStreamableHTTPClientTransport implements Transport {
       const parser = new RNEventSourceParser()
 
       xhr.open('POST', this._url, true)
+
+      // Set timeout if configured
+      if (this._timeout && this._timeout > 0) {
+        xhr.timeout = this._timeout
+      }
 
       // Set headers
       Object.entries(headers).forEach(([key, value]) => {
@@ -300,15 +312,44 @@ export class RNStreamableHTTPClientTransport implements Transport {
       }
 
       // Fallback to original fetch approach
+      // Create a timeout signal if timeout is configured
+      let timeoutSignal: AbortSignal | undefined
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      if (this._timeout && this._timeout > 0) {
+        const timeoutController = new AbortController()
+        timeoutId = setTimeout(() => timeoutController.abort(), this._timeout)
+        timeoutSignal = timeoutController.signal
+      }
+
+      // Combine abort signals if both exist
+      let signal = this._abortController?.signal
+      if (signal && timeoutSignal) {
+        // Combine abort signals from both timeout and external abort controller
+        const combinedController = new AbortController()
+        const onAbort = () => combinedController.abort()
+        signal.addEventListener('abort', onAbort)
+        timeoutSignal.addEventListener('abort', onAbort)
+        signal = combinedController.signal
+      } else if (timeoutSignal) {
+        signal = timeoutSignal
+      }
+
       const init: RequestInit = {
         ...this._requestInit,
         method: 'POST',
         headers,
         body: JSON.stringify(message),
-        signal: this._abortController?.signal
+        signal
       }
 
-      const response = await this._fetch(this._url, init)
+      let response: Response
+      try {
+        response = await this._fetch(this._url, init)
+      } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      }
 
       // Handle session ID received during initialization
       const sessionId = response.headers.get('mcp-session-id')

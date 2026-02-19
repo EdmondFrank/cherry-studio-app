@@ -371,6 +371,9 @@
         "invalid_json_content": "请输入有效的JSON格式。",
         "oauth": "OAuth",
         "oauth_failed": "OAuth 认证失败",
+        "timeout": "请求超时",
+        "timeout_placeholder": "300",
+        "timeout_help": "MCP工具调用的超时时间（秒），范围5-3600，默认300秒（5分钟）",
         "title": "认证"
       },
       "builtin": {

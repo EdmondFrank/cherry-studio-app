@@ -62,6 +62,7 @@ export default function McpDetailScreen() {
   const [localDescription, setLocalDescription] = useState<string>('')
   const [localUrl, setLocalUrl] = useState<string>('')
   const [localHeaders, setLocalHeaders] = useState<Record<string, string>>({})
+  const [localTimeout, setLocalTimeout] = useState<number>(300)
 
   // OAuth hook for HTTP type servers
   // Use localUrl since it's always current (synced with mcpServer.baseUrl and updated by user edits)
@@ -75,6 +76,7 @@ export default function McpDetailScreen() {
       setLocalDescription(mcpServer.description || '')
       setLocalUrl(mcpServer.baseUrl || '')
       setLocalHeaders(mcpServer.headers || {})
+      setLocalTimeout(mcpServer.timeout ?? 300)
     }
   }, [mcpServer])
 
@@ -186,6 +188,37 @@ export default function McpDetailScreen() {
     })
   }
 
+  const handleEditTimeout = () => {
+    tempValueRef.current = String(localTimeout)
+
+    presentDialog('info', {
+      title: t('mcp.auth.timeout'),
+      content: (
+        <TextField>
+          <TextField.Input
+            className="rounded-xl"
+            defaultValue={String(localTimeout)}
+            onChangeText={text => {
+              tempValueRef.current = text
+            }}
+            autoFocus
+            keyboardType="numeric"
+            placeholder={t('mcp.auth.timeout_placeholder')}
+          />
+        </TextField>
+      ),
+      onConfirm: async () => {
+        const newValue = parseInt(tempValueRef.current, 10)
+        // Validate range: 5-3600 seconds
+        const validValue = Math.min(Math.max(isNaN(newValue) ? 300 : newValue, 5), 3600)
+        setLocalTimeout(validValue)
+        if (validValue !== mcpServer?.timeout) {
+          await updateMcpServer({ timeout: validValue })
+        }
+      }
+    })
+  }
+
   const handleOAuthConnect = async () => {
     if (isAuthenticated) {
       clearAuth()
@@ -283,6 +316,16 @@ export default function McpDetailScreen() {
                     <Pressable onPress={handleEditHeaders} className="active:opacity-80">
                       <Text className="primary-text primary-border border-b">
                         {hasHeaders ? t('common.edit') : t('common.add')}
+                      </Text>
+                    </Pressable>
+                  </Row>
+
+                  {/* Timeout */}
+                  <Row>
+                    <Text>{t('mcp.auth.timeout')}</Text>
+                    <Pressable onPress={handleEditTimeout} className="active:opacity-80">
+                      <Text className="primary-text primary-border border-b">
+                        {localTimeout}s
                       </Text>
                     </Pressable>
                   </Row>

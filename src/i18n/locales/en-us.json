@@ -371,6 +371,9 @@
         "invalid_json_content": "Please enter valid JSON format for headers.",
         "oauth": "OAuth",
         "oauth_failed": "OAuth authentication failed",
+        "timeout": "Request Timeout",
+        "timeout_placeholder": "300",
+        "timeout_help": "Timeout for MCP tool calls (seconds), range 5-3600, default 300 seconds (5 minutes)",
         "title": "Authentication"
       },
       "builtin": {
