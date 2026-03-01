@@ -3,6 +3,7 @@
  * 将 Cherry Studio 消息格式转换为 AI SDK 消息格式
  */
 
+import { safeParseJSON } from '@ai-sdk/provider-utils'
 import type {
   AssistantModelMessage,
   FilePart,
@@ -18,7 +19,13 @@ import { isImageEnhancementModel, isVisionModel } from '@/config/models'
 import { loggerService } from '@/services/LoggerService'
 import type { Model } from '@/types/assistant'
 import type { FileMessageBlock, ImageMessageBlock, Message, ThinkingMessageBlock } from '@/types/message'
-import { findFileBlocks, findImageBlocks, findThinkingBlocks, getMainTextContent } from '@/utils/messageUtils/find'
+import {
+  findFileBlocks,
+  findImageBlocks,
+  findThinkingBlocks,
+  findToolBlocks,
+  getMainTextContent
+} from '@/utils/messageUtils/find'
 
 import { convertFileBlockToFilePart, convertFileBlockToTextPart } from './fileProcessor'
 
@@ -41,8 +48,77 @@ export async function convertMessageToSdkParam(
   if (message.role === 'user' || message.role === 'system') {
     return convertMessageToUserModelMessage(content, fileBlocks, imageBlocks, isVisionModel, model)
   } else {
-    return convertMessageToAssistantModelMessage(content, fileBlocks, reasoningBlocks, model)
+    return convertMessageToAssistantModelMessage(message, content, fileBlocks, reasoningBlocks, model)
   }
+}
+
+function stringifyToolOutput(value: unknown): string {
+  if (typeof value === 'string') return value
+
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+async function buildToolHistoryMessages(toolBlocks: any[]): Promise<ModelMessage[]> {
+  const toolResponses = toolBlocks.map((block) => (block as any)?.metadata?.rawMcpToolResponse).filter(Boolean)
+
+  // Only replay client-side tools (function_call/function_call_output).
+  // Provider-executed tools (e.g. web_search) have special replay semantics and are handled by the provider.
+  const replayable = toolResponses.filter((tr: any) => tr?.tool?.type !== 'provider')
+
+  if (replayable.length === 0) return []
+
+  const parseToolCallInput = async (value: unknown): Promise<unknown> => {
+    if (typeof value !== 'string') return value
+
+    const parsed = await safeParseJSON({ text: value })
+    return parsed.success ? parsed.value : value
+  }
+
+  const toolCallParts = await Promise.all(
+    replayable.map(async (tr: any) => ({
+      type: 'tool-call' as const,
+      toolCallId: tr.toolCallId ?? tr.id,
+      toolName: tr.tool?.name ?? tr.toolName,
+      input: await parseToolCallInput(tr.arguments)
+    }))
+  )
+
+  const toolResultParts = replayable
+    .filter((tr: any) => tr.status === 'done' || tr.status === 'error' || tr.status === 'cancelled')
+    .map((tr: any) => ({
+      type: 'tool-result' as const,
+      toolCallId: tr.toolCallId ?? tr.id,
+      toolName: tr.tool?.name ?? tr.toolName,
+      output: {
+        type: tr.status === 'error' || tr.status === 'cancelled' ? ('error-text' as const) : ('text' as const),
+        value:
+          tr.status === 'cancelled' && (tr.response === undefined || tr.response === null)
+            ? 'cancelled'
+            : stringifyToolOutput(tr.response)
+      }
+    }))
+
+  const messages: ModelMessage[] = []
+
+  if (toolCallParts.length > 0) {
+    messages.push({
+      role: 'assistant',
+      content: toolCallParts
+    })
+  }
+
+  if (toolResultParts.length > 0) {
+    messages.push({
+      role: 'tool',
+      content: toolResultParts
+    })
+  }
+
+  return messages
 }
 
 async function convertImageBlockToImagePart(imageBlocks: ImageMessageBlock[]): Promise<ImagePart[]> {
@@ -148,12 +224,17 @@ async function convertMessageToUserModelMessage(
  * 转换为助手模型消息
  */
 async function convertMessageToAssistantModelMessage(
+  message: Message,
   content: string,
   fileBlocks: FileMessageBlock[],
   thinkingBlocks: ThinkingMessageBlock[],
   model?: Model
-): Promise<AssistantModelMessage> {
-  const parts: (TextPart | FilePart)[] = []
+): Promise<ModelMessage | ModelMessage[]> {
+  const toolBlocks = await findToolBlocks(message)
+  const toolHistoryMessages = await buildToolHistoryMessages(toolBlocks)
+
+  const parts: Array<TextPart | FilePart> = []
+
   if (content) {
     parts.push({ type: 'text', text: content })
   }
@@ -179,10 +260,21 @@ async function convertMessageToAssistantModelMessage(
     }
   }
 
-  return {
+  const assistantMessage: AssistantModelMessage = {
     role: 'assistant',
     content: parts
   }
+
+  const hasAssistantContent =
+    typeof assistantMessage.content === 'string'
+      ? assistantMessage.content.trim().length > 0
+      : Array.isArray(assistantMessage.content) && assistantMessage.content.length > 0
+
+  if (toolHistoryMessages.length === 0) {
+    return assistantMessage
+  }
+
+  return hasAssistantContent ? [...toolHistoryMessages, assistantMessage] : toolHistoryMessages
 }
 /**
  * Converts an array of messages to SDK-compatible model messages.

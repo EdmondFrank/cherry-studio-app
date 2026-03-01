@@ -10,6 +10,7 @@ import {
   type MessageBlock,
   MessageBlockType,
   type ThinkingMessageBlock,
+  type ToolMessageBlock,
   type TranslationMessageBlock
 } from '@/types/message'
 
@@ -121,6 +122,29 @@ export const findFileBlocks = async (message: Message): Promise<FileMessageBlock
   }
 
   return fileBlocks
+}
+
+/**
+ * Finds all ToolMessageBlocks associated with a given message.
+ * @param message - The message object.
+ * @returns An array of ToolMessageBlocks (empty if none found).
+ */
+export const findToolBlocks = async (message: Message): Promise<ToolMessageBlock[]> => {
+  if (!message || !message.blocks || message.blocks.length === 0) {
+    return []
+  }
+
+  const toolBlocks: ToolMessageBlock[] = []
+
+  for (const blockId of message.blocks) {
+    const block = await messageBlockDatabase.getBlockById(blockId)
+
+    if (block && block.type === MessageBlockType.TOOL) {
+      toolBlocks.push(block as ToolMessageBlock)
+    }
+  }
+
+  return toolBlocks
 }
 
 /**
