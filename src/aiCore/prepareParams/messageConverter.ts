@@ -4,14 +4,12 @@
  */
 
 import type {
-  AssistantContent,
+  AssistantModelMessage,
   FilePart,
   ImagePart,
   ModelMessage,
   SystemModelMessage,
   TextPart,
-  ToolCallPart,
-  ToolResultPart,
   UserModelMessage
 } from 'ai'
 import { File } from 'expo-file-system'
@@ -19,8 +17,8 @@ import { File } from 'expo-file-system'
 import { isImageEnhancementModel, isVisionModel } from '@/config/models'
 import { loggerService } from '@/services/LoggerService'
 import type { Model } from '@/types/assistant'
-import type { FileMessageBlock, ImageMessageBlock, Message, ThinkingMessageBlock, ToolMessageBlock } from '@/types/message'
-import { findFileBlocks, findImageBlocks, findThinkingBlocks, findToolBlocks, getMainTextContent } from '@/utils/messageUtils/find'
+import type { FileMessageBlock, ImageMessageBlock, Message, ThinkingMessageBlock } from '@/types/message'
+import { findFileBlocks, findImageBlocks, findThinkingBlocks, getMainTextContent } from '@/utils/messageUtils/find'
 
 import { convertFileBlockToFilePart, convertFileBlockToTextPart } from './fileProcessor'
 
@@ -39,12 +37,11 @@ export async function convertMessageToSdkParam(
   const fileBlocks = await findFileBlocks(message)
   const imageBlocks = await findImageBlocks(message)
   const reasoningBlocks = await findThinkingBlocks(message)
-  const toolBlocks = await findToolBlocks(message)
 
   if (message.role === 'user' || message.role === 'system') {
     return convertMessageToUserModelMessage(content, fileBlocks, imageBlocks, isVisionModel, model)
   } else {
-    return convertMessageToAssistantAndToolMessages(content, fileBlocks, toolBlocks, reasoningBlocks, model)
+    return convertMessageToAssistantModelMessage(content, fileBlocks, reasoningBlocks, model)
   }
 }
 
@@ -147,65 +144,30 @@ async function convertMessageToUserModelMessage(
     content: parts
   }
 }
-function convertToolBlockToToolCallPart(toolBlock: ToolMessageBlock): ToolCallPart {
-  return {
-    type: 'tool-call',
-    toolCallId: toolBlock.toolId,
-    toolName: toolBlock.toolName || 'unknown',
-    input: toolBlock.arguments || {}
-  }
-}
-
-function convertToolBlockToToolResultPart(toolBlock: ToolMessageBlock): ToolResultPart {
-  const content = toolBlock.content
-  let output: ToolResultPart['output']
-
-  if (content === undefined || content === null) {
-    output = { type: 'text', value: '' }
-  } else if (typeof content === 'string') {
-    output = { type: 'text', value: content }
-  } else {
-    output = { type: 'json', value: content }
-  }
-
-  return {
-    type: 'tool-result',
-    toolCallId: toolBlock.toolId,
-    toolName: toolBlock.toolName || 'unknown',
-    output
-  }
-}
-
-function hasToolResult(toolBlock: ToolMessageBlock): boolean {
-  return toolBlock.content !== undefined && toolBlock.content !== null
-}
-
-async function convertMessageToAssistantAndToolMessages(
+/**
+ * 转换为助手模型消息
+ */
+async function convertMessageToAssistantModelMessage(
   content: string,
   fileBlocks: FileMessageBlock[],
-  toolBlocks: ToolMessageBlock[],
   thinkingBlocks: ThinkingMessageBlock[],
   model?: Model
-): Promise<ModelMessage | ModelMessage[]> {
-  const assistantParts: AssistantContent = []
-
-  // 添加文本内容
+): Promise<AssistantModelMessage> {
+  const parts: (TextPart | FilePart)[] = []
   if (content) {
-    assistantParts.push({ type: 'text', text: content })
+    parts.push({ type: 'text', text: content })
   }
 
-  // 添加推理内容
   for (const thinkingBlock of thinkingBlocks) {
-    assistantParts.push({ type: 'reasoning', text: thinkingBlock.content })
+    parts.push({ type: 'reasoning', text: thinkingBlock.content })
   }
 
-  // 处理文件
   for (const fileBlock of fileBlocks) {
     // 优先尝试原生文件支持（PDF等）
     if (model) {
       const filePart = await convertFileBlockToFilePart(fileBlock, model)
       if (filePart) {
-        assistantParts.push(filePart)
+        parts.push(filePart)
         continue
       }
     }
@@ -213,33 +175,13 @@ async function convertMessageToAssistantAndToolMessages(
     // 回退到文本处理
     const textPart = await convertFileBlockToTextPart(fileBlock)
     if (textPart) {
-      assistantParts.push(textPart)
-    }
-  }
-
-  // 如果没有 tool blocks，直接返回 assistant 消息
-  if (toolBlocks.length === 0) {
-    return {
-      role: 'assistant',
-      content: assistantParts
-    }
-  }
-
-  // 处理 tool blocks
-  // 将 tool calls 和 tool results 都添加到 assistant 消息的 content 中
-  for (const toolBlock of toolBlocks) {
-    // 添加 tool call
-    assistantParts.push(convertToolBlockToToolCallPart(toolBlock))
-
-    // 如果有结果，添加 tool result
-    if (hasToolResult(toolBlock)) {
-      assistantParts.push(convertToolBlockToToolResultPart(toolBlock))
+      parts.push(textPart)
     }
   }
 
   return {
     role: 'assistant',
-    content: assistantParts
+    content: parts
   }
 }
 /**
