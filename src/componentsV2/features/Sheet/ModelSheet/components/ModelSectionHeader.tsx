@@ -26,13 +26,13 @@ export const ModelSectionHeader: React.FC<ModelSectionHeaderProps> = ({ section,
       }}
       className="px-2 py-1">
       <XStack className="items-center justify-start gap-3 px-0">
-        <Text className="text-zinc-400/400 text-sm font-bold ">{section.title.toUpperCase()}</Text>
+        <Text className="text-zinc-400/400 text-lg font-bold ">{section.title.toUpperCase()}</Text>
       </XStack>
       {section.provider.id !== 'cherryai' && (
         <Pressable
           onPress={() => onSettingsPress(section.provider)}
           style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
-          <Settings className="text-zinc-600/80" size={16} />
+          <Settings className="text-zinc-600/80" size={20} />
         </Pressable>
       )}
     </View>

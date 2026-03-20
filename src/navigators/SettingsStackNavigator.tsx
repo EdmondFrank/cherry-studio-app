@@ -1,4 +1,4 @@
-import { createStackNavigator, TransitionPresets } from '@react-navigation/stack'
+import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import React from 'react'
 
 import SettingsScreen from '@/screens/settings/SettingsScreen'
@@ -20,17 +20,22 @@ export type SettingsStackParamList = {
   AboutSettings: undefined
 }
 
-const Stack = createStackNavigator<SettingsStackParamList>()
+const Stack = createNativeStackNavigator<SettingsStackParamList>()
 
 export default function SettingsStackNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: false,
-        gestureResponseDistance: 9999,
-        ...TransitionPresets.SlideFromRightIOS
+        animation: 'ios_from_right',
+        gestureEnabled: true,
+        fullScreenGestureEnabled: true
       }}>
-      <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
+      <Stack.Screen
+        name="SettingsScreen"
+        component={SettingsScreen}
+        options={{ gestureEnabled: false, fullScreenGestureEnabled: false }}
+      />
       <Stack.Screen name="GeneralSettings" component={GeneralSettingsStackNavigator} />
       <Stack.Screen name="AssistantSettings" component={AssistantSettingsStackNavigator} />
       <Stack.Screen name="ProvidersSettings" component={ProvidersStackNavigator} />

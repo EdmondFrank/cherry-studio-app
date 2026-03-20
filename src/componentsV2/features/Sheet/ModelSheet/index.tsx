@@ -97,7 +97,7 @@ const ModelSheet: React.FC = () => {
       dimmed
       scrollable
       header={
-        <View>
+        <View className="bg-card gap-1">
           <ModelListHeader
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -106,7 +106,6 @@ const ModelSheet: React.FC = () => {
             onToggleMultiSelect={toggleMultiSelectMode}
             onClearAll={handleClearAll}
           />
-          <View className="my-1" />
           <ModelProviderTabBar
             selectOptions={selectOptions}
             activeProvider={activeProvider}
