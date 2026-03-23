@@ -18,6 +18,7 @@ import { useInitialScrollToEnd } from '@/hooks/chat/useInitialScrollToEnd'
 import { useTopicBlocks } from '@/hooks/useMessageBlocks'
 import { useMessages } from '@/hooks/useMessages'
 import { usePreference } from '@/hooks/usePreference'
+import { useTextSelection } from '@/contexts/TextSelectionContext'
 import { useTheme } from '@/hooks/useTheme'
 import type { RootState } from '@/store'
 import type { Assistant, Topic } from '@/types/assistant'
@@ -40,6 +41,7 @@ const Messages: FC<MessagesProps> = ({ assistant, topic }) => {
   const { messageBlocks } = useTopicBlocks(topic.id)
   const { isDark } = useTheme()
   const [autoScroll] = usePreference('chat.auto_scroll')
+  const { isSelectingText } = useTextSelection()
   const groupedMessages = Object.entries(getGroupedMessages(messages))
   const legendListRef = useRef<LegendListRef>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
@@ -146,7 +148,7 @@ const Messages: FC<MessagesProps> = ({ assistant, topic }) => {
         onScroll={handleScroll}
         scrollEventThrottle={16}
         recycleItems
-        maintainScrollAtEnd={autoScroll}
+        maintainScrollAtEnd={autoScroll && !isSelectingText}
         maintainScrollAtEndThreshold={0.1}
         keyboardShouldPersistTaps="never"
         keyboardDismissMode="on-drag"
