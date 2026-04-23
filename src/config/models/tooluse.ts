@@ -28,7 +28,7 @@ export const FUNCTION_CALLING_MODELS = [
   'gemini(?:-[\w-]+)?',
   'grok-3(?:-[\w-]+)?',
   'doubao-seed-1[.-]6(?:-[\w-]+)?',
-  'kimi-k2(?:-[\w-]+)?',
+  'kimi-k2(?:[.-][\w-]+)?',
   'ling-\w+(?:-[\w-]+)?',
   'ring-\w+(?:-[\w-]+)?',
   'minimax-m2'

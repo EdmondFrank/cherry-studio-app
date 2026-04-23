@@ -52,7 +52,8 @@ const ThinkModelTypes = [
   'zhipu',
   'perplexity',
   'deepseek_hybrid',
-  'kimi_k2_5'
+  'kimi_k2_5',
+  'kimi_k2_6'
 ] as const
 
 export type ReasoningEffortOption = NonNullable<OpenAI.ReasoningEffort> | 'auto' | 'none'

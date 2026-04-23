@@ -247,6 +247,12 @@ export const SYSTEM_MODELS: Record<SystemProviderId | 'defaultModel', Model[]> =
       group: 'moonshot'
     },
     {
+      id: 'kimi-k2.6',
+      provider: 'aihubmix',
+      name: 'kimi-k2.6',
+      group: 'moonshot'
+    },
+    {
       id: 'Llama-4-Scout-17B-16E-Instruct',
       provider: 'aihubmix',
       name: 'Llama-4-Scout-17B-16E-Instruct',
@@ -808,6 +814,14 @@ export const SYSTEM_MODELS: Record<SystemProviderId | 'defaultModel', Model[]> =
         output_per_million_tokens: 2.5,
         currencySymbol: 'USD'
       }
+    },
+    {
+      id: 'kimi-k2.6',
+      name: 'kimi-k2.6',
+      provider: 'moonshot',
+      group: 'kimi-k2.6',
+      owned_by: 'moonshot',
+      capabilities: [{ type: 'text' }, { type: 'function_calling' }]
     }
   ],
   baichuan: [

@@ -41,7 +41,8 @@ export const MODEL_SUPPORTED_REASONING_EFFORT: ReasoningEffortConfig = {
   zhipu: ['auto'] as const,
   perplexity: ['low', 'medium', 'high'] as const,
   deepseek_hybrid: ['auto'] as const,
-  kimi_k2_5: ['none', 'auto'] as const
+  kimi_k2_5: ['none', 'auto'] as const,
+  kimi_k2_6: ['none', 'auto'] as const
 } as const
 
 // 模型类型到支持选项的映射表
@@ -67,7 +68,8 @@ export const MODEL_SUPPORTED_OPTIONS: ThinkingOptionConfig = {
   zhipu: ['none', ...MODEL_SUPPORTED_REASONING_EFFORT.zhipu] as const,
   perplexity: MODEL_SUPPORTED_REASONING_EFFORT.perplexity,
   deepseek_hybrid: ['none', ...MODEL_SUPPORTED_REASONING_EFFORT.deepseek_hybrid] as const,
-  kimi_k2_5: ['default', ...MODEL_SUPPORTED_REASONING_EFFORT.kimi_k2_5] as const
+  kimi_k2_5: ['default', ...MODEL_SUPPORTED_REASONING_EFFORT.kimi_k2_5] as const,
+  kimi_k2_6: ['default', ...MODEL_SUPPORTED_REASONING_EFFORT.kimi_k2_6] as const
 } as const
 
 const withModelIdAndNameAsId = <T>(model: Model, fn: (model: Model) => T): { idResult: T; nameResult: T } => {
@@ -128,7 +130,12 @@ const _getThinkModelType = (model: Model): ThinkingModelType => {
   else if (isSupportedThinkingTokenZhipuModel(model)) thinkingModelType = 'zhipu'
   else if (isDeepSeekHybridInferenceModel(model)) thinkingModelType = 'deepseek_hybrid'
   else if (isSupportedThinkingTokenKimiModel(model)) {
-    thinkingModelType = 'kimi_k2_5'
+    const modelId = getLowerBaseModelName(model.id, '/')
+    if (modelId.includes('kimi-k2.6')) {
+      thinkingModelType = 'kimi_k2_6'
+    } else {
+      thinkingModelType = 'kimi_k2_5'
+    }
   }
   return thinkingModelType
 }
@@ -448,14 +455,14 @@ export const isSupportedThinkingTokenZhipuModel = (model: Model): boolean => {
  * Detects whether a Kimi model supports thinking control
  *
  * This function identifies Kimi models that support thinking token control.
- * Currently only supports Kimi K2.5 and its variants.
+ * Currently supports Kimi K2.5, K2.6 and their variants.
  *
  * @param model - The model object to check
  * @returns true if the model supports thinking control, false otherwise
  */
 export const isSupportedThinkingTokenKimiModel = (model: Model): boolean => {
   const modelId = getLowerBaseModelName(model.id, '/')
-  return ['kimi-k2.5'].some((id) => modelId.includes(id))
+  return ['kimi-k2.5', 'kimi-k2.6'].some((id) => modelId.includes(id))
 }
 
 export const isDeepSeekHybridInferenceModel = (model: Model) => {
@@ -512,6 +519,7 @@ export const isMiniMaxReasoningModel = (model?: Model): boolean => {
  * Currently should only support:
  * - Kimi K2 Thinking and its variants (including -turbo suffix)
  * - Kimi K2.5
+ * - Kimi K2.6
  *
  * @param model - The model object to check, can be undefined
  * @returns true if it's a Kimi reasoning model, false otherwise
@@ -521,9 +529,9 @@ export function isKimiReasoningModel(model?: Model): boolean {
     return false
   }
   const modelId = getLowerBaseModelName(model.id, '/')
-  // Match kimi-k2-thinking, kimi-k2-thinking-turbo, or kimi-k2.5
+  // Match kimi-k2-thinking, kimi-k2-thinking-turbo, kimi-k2.5, or kimi-k2.6
   // The regex ensures no extra suffixes after these patterns
-  return /^kimi-k2-thinking(?:-turbo)?$|^kimi-k2\.5(?:-\w)*$/.test(modelId)
+  return /^kimi-k2-thinking(?:-turbo)?$|^kimi-k2\.[56](?:-\w)*$/.test(modelId)
 }
 
 export function isReasoningModel(model?: Model): boolean {
